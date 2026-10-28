@@ -124,31 +124,31 @@ public class DefaultApplication implements Application {
          try {
             studio_.core().setExposure(exposureTime);
             studio_.core().waitForDevice(studio_.core().getCameraDevice());
-            if (AcqControlDlg.getShouldSyncExposure()) {
-               double exposure = studio_.core().getExposure();
-               studio_.events().post(new DefaultChannelExposureEvent(exposure,
-                        channelGroup, channel, true));
-            }
+            updateExposureFromCamera(channelGroup, channel);
          } catch (Exception e) {
-            try {
-               double exposure = studio_.core().getExposure();
-               String camera = studio_.core().getCameraDevice();
-               // Defer the update until the exposure field's document listener has finished.
-               SwingUtilities.invokeLater(() -> studio_.events().post(
-                     new DefaultExposureChangedEvent(camera, exposure)));
-               if (AcqControlDlg.getShouldSyncExposure()) {
-                  storeChannelExposureTime(channelGroup, channel, exposure);
-                  studio_.events().post(new DefaultChannelExposureEvent(exposure,
-                           channelGroup, channel, true));
-               }
-            } catch (Exception ex) {
-               ReportingUtils.logError(ex, "Failed to read exposure time.");
-            }
+            updateExposureFromCamera(channelGroup, channel);
             SwingUtilities.invokeLater(() ->
                   ReportingUtils.showError(e, "Failed to set camera exposure time."));
          } finally {
             studio_.live().setSuspended(false);
          }
+      }
+   }
+
+   private void updateExposureFromCamera(String channelGroup, String channel) {
+      try {
+         double exposure = studio_.core().getExposure();
+         String camera = studio_.core().getCameraDevice();
+         if (AcqControlDlg.getShouldSyncExposure()) {
+            storeChannelExposureTime(channelGroup, channel, exposure);
+            studio_.events().post(new DefaultChannelExposureEvent(exposure,
+                     channelGroup, channel, true));
+         }
+         // Defer the update until the exposure field's document listener has finished.
+         SwingUtilities.invokeLater(() -> studio_.events().post(
+               new DefaultExposureChangedEvent(camera, exposure)));
+      } catch (Exception e) {
+         ReportingUtils.logError(e, "Failed to update exposure from camera.");
       }
    }
 
