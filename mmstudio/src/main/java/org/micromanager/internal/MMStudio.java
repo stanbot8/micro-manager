@@ -707,7 +707,12 @@ public final class MMStudio implements Studio {
    @Subscribe
    public void onExposureChanged(ExposureChangedEvent event) {
       if (event.getCameraName().equals(cache().getCameraLabel())) {
-         ui_.frame().setDisplayedExposureTime(event.getNewExposureTime());
+         try {
+            // Queued callbacks can contain an older or rejected exposure value.
+            ui_.frame().setDisplayedExposureTime(core_.getExposure());
+         } catch (Exception e) {
+            ReportingUtils.logError(e, "Failed to read camera exposure time.");
+         }
       }
    }
 
