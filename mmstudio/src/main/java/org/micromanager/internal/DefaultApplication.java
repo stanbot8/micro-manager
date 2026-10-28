@@ -35,10 +35,12 @@ import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
 import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
 import org.micromanager.Application;
 import org.micromanager.ApplicationSkin;
 import org.micromanager.Studio;
 import org.micromanager.events.internal.DefaultChannelExposureEvent;
+import org.micromanager.events.internal.DefaultExposureChangedEvent;
 import org.micromanager.internal.dialogs.AcqControlDlg;
 import org.micromanager.internal.hcwizard.MMConfigFileException;
 import org.micromanager.internal.hcwizard.MicroscopeModel;
@@ -128,18 +130,25 @@ public class DefaultApplication implements Application {
                         channelGroup, channel, true));
             }
          } catch (Exception e) {
-            ReportingUtils.logError(e, "Failed to set core exposure time.");
-            if (AcqControlDlg.getShouldSyncExposure()) {
-               try {
-                  double exposure = studio_.core().getExposure();
+            try {
+               double exposure = studio_.core().getExposure();
+               String camera = studio_.core().getCameraDevice();
+               // Defer the update until the exposure field's document listener has finished.
+               SwingUtilities.invokeLater(() -> studio_.events().post(
+                     new DefaultExposureChangedEvent(camera, exposure)));
+               if (AcqControlDlg.getShouldSyncExposure()) {
+                  storeChannelExposureTime(channelGroup, channel, exposure);
                   studio_.events().post(new DefaultChannelExposureEvent(exposure,
                            channelGroup, channel, true));
-               } catch (Exception ex) {
-                  ReportingUtils.logError(ex, "Failed to read exposure time.");
                }
+            } catch (Exception ex) {
+               ReportingUtils.logError(ex, "Failed to read exposure time.");
             }
+            SwingUtilities.invokeLater(() ->
+                  ReportingUtils.showError(e, "Failed to set camera exposure time."));
+         } finally {
+            studio_.live().setSuspended(false);
          }
-         studio_.live().setSuspended(false);
       }
    }
 
